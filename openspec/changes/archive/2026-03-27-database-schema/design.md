@@ -1,0 +1,127 @@
+## Context
+
+Greenfield database schema for a time tracking application. No existing tables or migrations exist. Authentication is handled externally by Entra ID — the application only needs to store identity references and manage authorization internally. PostgreSQL is the target database, managed through EF Core migrations.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Define a normalized, relational schema for employees, departments, roles, projects, and time entries
+- Establish EF Core entity configurations and an initial migration
+- Support role-based authorization with a many-to-many employee-role relationship
+- Link employees to Entra ID via an external identifier (no passwords or auth tokens stored)
+
+**Non-Goals:**
+- API endpoints or controllers — data layer only
+- Audit logging or soft deletes (can be added later)
+- Reporting views or materialized queries
+- Entra ID integration code — only the schema reference point
+
+## Decisions
+
+### 1. Entra ID linkage via `ExternalId` column
+
+Store the Entra ID object identifier as a string column on `Employees`. No email/password fields.
+
+**Why:** Authentication is fully delegated to Entra ID. We only need a stable foreign key to correlate the external identity with our internal employee record.
+
+**Alternatives considered:**
+- Store email as the link → rejected because email can change; Entra ID object IDs are immutable.
+
+### 2. Many-to-many employee-role via join table `EmployeeRoles`
+
+Use an explicit join table rather than embedding roles as a JSON column or enum flags.
+
+**Why:** Enables querying roles efficiently, supports future permission expansion, and follows relational best practices. EF Core handles many-to-many join tables natively.
+
+**Alternatives considered:**
+- JSON array column → rejected because it prevents relational queries and foreign key enforcement.
+- Bitflag enum → rejected because it limits role count and is harder to extend.
+
+### 3. Employee belongs to one department (FK on `Employees`)
+
+A single `DepartmentId` foreign key on the `Employees` table rather than a join table.
+
+**Why:** The requirement is to record which department an employee belongs to — a simple one-to-many relationship. If employees need to belong to multiple departments in the future, this can be migrated to a join table.
+
+### 4. Employee-project assignment via `ProjectAssignments` join table
+
+Employees must be assigned to a project before they can log time against it. A many-to-many `ProjectAssignments` table links employees to their assigned projects.
+
+**Why:** Prevents employees from logging time to arbitrary projects. The assignment acts as a gatekeeper — time entries reference the assignment relationship rather than the project directly.
+
+### 5. Entity relationship model
+
+```
+┌─────────────────────────────┐       ┌─────────────────────────────┐
+│ Departments                 │       │ Roles                       │
+│─────────────────────────────│       │─────────────────────────────│
+│ Id           Guid (PK)      │       │ Id           Guid (PK)      │
+│ Name         string (100)   │       │ Name         string (50)    │
+│ Code         string (10)    │       │ Description  string (500)   │
+└──────────┬──────────────────┘       └──────────┬──────────────────┘
+           │ 1:N                                 │ M:N
+           ▼                                     ▼
+┌─────────────────────────────┐       ┌─────────────────────────────┐
+│ Employees                   │       │ EmployeeRoles               │
+│─────────────────────────────│       │─────────────────────────────│
+│ Id           Guid (PK)      │◄──────│ EmployeeId   Guid (PK,FK)   │
+│ ExternalId   string (128)   │       │ RoleId       Guid (PK,FK)   
+│
+│ FirstName    string (100)   │       └─────────────────────────────┘
+│ LastName     string (100)   │
+│ Email        string (256)   │
+│ DepartmentId Guid (FK)      │
+└──────────┬──────────────────┘
+           │ M:N
+           ▼
+┌─────────────────────────────┐
+│ ProjectAssignments          │
+│─────────────────────────────│
+│ EmployeeId   Guid (PK,FK)  │
+│ ProjectId    Guid (PK,FK)  │
+└──────────┬──────────────────┘
+           │ N:1
+           ▼
+┌─────────────────────────────┐
+│ Projects                    │
+│─────────────────────────────│
+│ Id           Guid (PK)      │
+│ Name         string (200)   │
+│ Code         string (10)    │
+│ Status       string (20)    │
+│ Description  string (1000)  │
+└──────────┬──────────────────┘
+           │ 1:N
+           ▼
+┌─────────────────────────────┐
+│ TimeEntries                 │
+│─────────────────────────────│
+│ Id           Guid (PK)      │
+│ EmployeeId   Guid (FK)      │
+│ ProjectId    Guid (FK)      │
+│ Date         DateOnly       │
+│ Hours        decimal (4,2)  │
+│ Description  string (500)   │
+└─────────────────────────────┘
+```
+
+### 6. Use GUIDs for primary keys, named `Id`
+
+All tables use `Guid` primary keys generated by the application (not the database). The column is always named `Id` (following EF Core convention), never `Guid` or `UniqueId`. This is a project-wide convention for all current and future tables.
+
+**Why:** Supports distributed ID generation, avoids sequential ID exposure, and works well with EF Core's default conventions. Consistent `Id` naming keeps entity code simple and predictable.
+
+**Alternatives considered:**
+- Auto-increment integers → rejected because they leak record counts and complicate distributed scenarios.
+
+### 7. PostgreSQL with EF Core Npgsql provider
+
+Use `Npgsql.EntityFrameworkCore.PostgreSQL` as the database provider with code-first migrations.
+
+**Why:** Matches the hosting decision (Azure-hosted PostgreSQL). Code-first migrations keep schema changes versioned alongside application code.
+
+## Risks / Trade-offs
+
+- **GUID primary keys increase index size** → Acceptable for this scale. Can switch to ULIDs or sequential GUIDs if performance becomes an issue.
+- **Single department per employee is restrictive** → Mitigated by keeping the design simple now; migration to a join table is straightforward if needed.
+- **No soft deletes** → Hard deletes could lose audit trail. Mitigated by deferring this to a future change when audit requirements are defined.

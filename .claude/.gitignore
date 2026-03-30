@@ -1,0 +1,12 @@
+# Ignore everything by default
+*
+
+# Allow skill definitions
+!skills/
+!skills/api-minimal/
+!skills/api-minimal/**
+!skills/file-structure-project/
+!skills/file-structure-project/**
+
+# Allow this file
+!.gitignore

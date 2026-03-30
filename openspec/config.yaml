@@ -1,0 +1,42 @@
+schema: spec-driven
+
+context: |
+  Project overview:
+  TimeManagement is a time tracking and management application so that employees can
+  easily log their work hours, and track that against projects.
+  
+  Tech stack:
+  
+  Backend:
+  - C#
+  - .NET 10
+  - ASP.NET Core
+  - Entity Framework Core
+  - SQL Server
+
+  Frontend:
+  - Vue.js
+  - TypeScript
+  - Pinia
+  - Tailwind CSS
+
+  Hosting:
+  - Azure App Service (API, Front-end)
+  - Azure Functions (Background jobs)
+  - PostgreSQL (Database)
+
+  Local development:
+  - Podman (Docker Compatible containerization)
+  - Visual Studio Code (IDE)  
+
+  namespace for coding: TimeManagement
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
