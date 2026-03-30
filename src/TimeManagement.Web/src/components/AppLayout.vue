@@ -10,14 +10,29 @@ import { RouterLink, RouterView } from 'vue-router'
       </div>
       <ul class="menu flex-1 p-2">
         <li>
-          <RouterLink to="/roles" active-class="active">
-            Roles
-          </RouterLink>
+          <RouterLink to="/dashboard" active-class="active">Dashboard</RouterLink>
         </li>
         <li>
-          <RouterLink to="/departments" active-class="active">
-            Departments
-          </RouterLink>
+          <RouterLink to="/time-entries" active-class="active">Time Entries</RouterLink>
+        </li>
+        <li>
+          <details open>
+            <summary>Admin</summary>
+            <ul>
+              <li>
+                <RouterLink to="/roles" active-class="active">Roles</RouterLink>
+              </li>
+              <li>
+                <RouterLink to="/departments" active-class="active">Departments</RouterLink>
+              </li>
+              <li>
+                <RouterLink to="/projects" active-class="active">Projects</RouterLink>
+              </li>
+              <li>
+                <RouterLink to="/employees" active-class="active">Employees</RouterLink>
+              </li>
+            </ul>
+          </details>
         </li>
       </ul>
     </nav>
